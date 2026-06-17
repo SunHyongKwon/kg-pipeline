@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# kg-pipeline SessionStart: 번들 불가 외부 의존성(graphify, scrapling) 설치 점검.
-# 설치돼 있으면 조용히, 빠진 것만 한 번 안내한다.
+# kg-pipeline SessionStart: KG 작업 폴더에서만 외부 의존성(graphify, scrapling) 점검.
+# kg-input/ 또는 graphify-out/ 또는 KG-DESIGN.md 가 없으면 이 폴더는 KG 작업과 무관하므로
+# 아무 출력 없이 빠진다(전역으로 설치돼도 관계없는 세션을 시끄럽게 하지 않는다).
+if [ ! -d kg-input ] && [ ! -d graphify-out ] && [ ! -f KG-DESIGN.md ] && [ ! -f graphify-out/KG-DESIGN.md ]; then
+  exit 0
+fi
+
 miss=""
 
 # graphify: CLI 가 PATH 에 있거나, 어떤 python 인터프리터든 패키지가 import 되면 OK

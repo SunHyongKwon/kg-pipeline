@@ -14,7 +14,7 @@
 
 ## 사전 요구사항 (번들 불가, 직접 설치)
 
-플러그인이 설치된 세션에서 SessionStart hook이 미설치 항목을 안내한다.
+KG 작업 폴더(`kg-input/` 또는 `graphify-out/` 가 있는 폴더)에서 세션을 열면 SessionStart hook이 미설치 항목만 안내한다. KG와 무관한 폴더에서는 조용하다.
 
 - **python3** (kg-query/get-content 엔진, 표준 라이브러리만 사용)
 - **graphify** (KG 빌드 엔진, 필수): `pipx install graphify` 또는 `pip install graphify`
