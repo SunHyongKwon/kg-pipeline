@@ -1,0 +1,15 @@
+{
+  "name": "kg-pipeline",
+  "owner": {
+    "name": "SunHyongKwon"
+  },
+  "description": "Knowledge graph pipeline: collect sources (get-content), build a clustered graph (kg-design over graphify), and query it (kg-query).",
+  "plugins": [
+    {
+      "name": "kg-pipeline",
+      "source": "./",
+      "description": "End-to-end knowledge-graph lifecycle with a clustering gate and span-level provenance.",
+      "version": "0.1.0"
+    }
+  ]
+}
