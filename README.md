@@ -9,15 +9,18 @@
 | 스킬 | 역할 |
 |---|---|
 | `kg-pipeline:get-content` | 외부 자료 수집 → KG 입력 마크다운. urllib 우선, 막히면(봇차단/JS-only) **scrapling 폴백**. 출처 frontmatter 부착. |
-| `kg-pipeline:kg-design` | 설계(허브/분할/관계정책을 사람과 합의) + 빌드(graphify) + 클러스터 정제(modularity 게이트) + 감사. |
+| `kg-pipeline:kg-design` | 설계(허브/분할/관계정책 합의) + 빌드(**기본: schema-first 번들 빌더** / 선택: graphify bottom-up) + 클러스터 정제(modularity 게이트) + 감사. |
 | `kg-pipeline:kg-query` | graph.json 질의. 질문 유형에 따라 BFS(이웃)/DFS(체인)/PATH(두 노드)/타입필터. 출처로 원문 검증. |
 
 ## 사전 요구사항 (번들 불가, 직접 설치)
 
 KG 작업 폴더(`kg-input/` 또는 `graphify-out/` 가 있는 폴더)에서 세션을 열면 SessionStart hook이 미설치 항목만 안내한다. KG와 무관한 폴더에서는 조용하다.
 
-- **python3** (kg-query/get-content 엔진, 표준 라이브러리만 사용)
-- **graphify** (KG 빌드 엔진, 필수): `pipx install graphify` 또는 `pip install graphify`
+- **python3** (kg-query/get-content/schema-first 빌더 엔진)
+- **networkx** (schema-first 빌더의 modularity 계산): `pip install networkx`
+  - kg-design 의 **기본 경로(schema-first, Path 1)** 는 python3 + networkx 만으로 동작한다. graphify 불필요.
+- **graphify** (bottom-up 빌드 경로 Path 2 / 코드 코퍼스용, 선택): `pip install graphifyy` 후 `graphify install`
+  - 주의: PyPI 배포명은 **`graphifyy`(y 두 개)**, CLI 명령은 `graphify`. `pip install graphify`(y 한 개)는 PyPI 에 없어 실패한다.
 - **scrapling** (get-content 봇우회 폴백, 선택): `pip install "scrapling[fetchers]" && scrapling install`
   - 미설치 시 get-content 의 urllib 경로는 동작하지만, 막히는 사이트는 못 뚫는다.
 
@@ -42,15 +45,18 @@ claude --plugin-dir /path/to/kg-pipeline
 
 1. **수집**: `/kg-pipeline:get-content <url>` → `kg-input/sources/` 에 출처 메타와 함께 저장.
 2. **최초 구축(1회)**: `/kg-pipeline:kg-design` → 설계+빌드+정제+감사. 산출물은 `graphify-out/` 에 모인다(graph.json, graph.html, KG-DESIGN.md, KG-AUDIT.md).
-3. **새 자료 추가**: `graphify <path> --update` 후 `refine_graph.py --apply` 재실행(풀 재설계 아님).
+3. **새 자료 추가**:
+   - schema-first(기본): 추가 슬라이스만 재추출 → `extractions.json` 에 병합 → `build_schema_graph.py` 재실행(stable id 라 기존 그래프와 자동 병합).
+   - graphify(Path 2): `graphify <path> --update` 후 `refine_graph.py --apply` 재실행. (둘 다 풀 재설계 아님)
 4. **질의**: `/kg-pipeline:kg-query "<질문>"` → 그래프에서 관련 서브그래프 회수 → 출처로 원문 검증.
 
 프로젝트에 운영 규칙을 박아두려면 `templates/CLAUDE.md` 블록을 그 프로젝트의 `CLAUDE.md` 에 붙여넣는다.
 
 ## 설계 메모
 
-- graphify 는 빌드 엔진(pip 패키지)이라 플러그인에 번들하지 않고 외부 의존성으로 둔다.
-- 클러스터가 또렷한 KG = 허브-스포크 위상 + 약한 `mentioned_in` 류 엣지 제거. kg-design 의 refine 단계가 이를 강제한다.
+- **빌드 경로는 둘**: 기본은 **schema-first**(번들 `skills/kg-design/build_schema_graph.py`, python3+networkx만 필요 — 스키마·canonical id·관계정책으로 헤어볼을 원천 차단). 선택은 **graphify**(bottom-up 자동추출, 코드 코퍼스·빠른 탐색용; 외부 의존성 `pip install graphifyy`).
+- 큐레이션형/한글/감사필요 KG 에는 schema-first 권장: graphify 의 bottom-up 은 같은 엔티티를 문서별로 쪼개고(=다리 끊김), 약한 `references`/`mentioned_in` 엣지로 god-hub·헤어볼을 만든다(실측). schema-first 는 추출 단계에서 이를 만들지 않는다.
+- 클러스터가 또렷한 KG = 허브-스포크 위상 + 약한 mention 엣지 제거. schema-first 는 빌드시 modularity 게이트로, graphify 경로는 refine 단계로 강제한다.
 - 한글 등 비ASCII 코퍼스: 노드 id 를 자동 transliteration 에 맡기지 말고 개념별 안정 ASCII 슬러그를 고정 재사용(kg-design 추출 규칙에 포함).
 
 ## 라이선스

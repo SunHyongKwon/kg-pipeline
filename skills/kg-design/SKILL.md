@@ -116,14 +116,33 @@ A pretty, well-separated graph is not luck - it comes from a **hub-and-spoke top
 
 ---
 
-## Phase B - BUILD (hand off to graphify where it fits)
+## Phase B - BUILD (two paths; schema-first is the DEFAULT for quality-critical KGs)
 
-Decide the build path from the design:
+graphify is a **bottom-up, schema-free** concept extractor. Great for "what's in this folder?" exploration, but on a *curated* corpus it actively works against a clean KG, and this is measured, not hypothetical (2-article Korean test):
+- **It namespaces node ids per-document**, so one real entity fragments into a different node per file. 아이젠사이언스 became `hanmi_..._aigensciences` AND `yuhan_..._aigensciences` - two disconnected nodes, so the cross-document bridge (one partner working with two pharmas) is **lost**.
+- **It fills the graph with weak edges** - `references` / `conceptually_related_to` / `semantically_similar_to` were ~79% of edges. These turn document nodes into god-hubs: the hairball.
+- **It leaves nodes untyped** (type=None), so you cannot ask "list all Partners" or "which companies share a partner".
 
-- **Concept/corpus KG from unstructured files** (notes, papers, code, docs): graphify is ideal. Invoke it.
-- **Curated/structured property graph or strict schema-first KG**: graphify's auto-extraction will not respect your schema. Build schema-first (apply the A4 schema, map structured sources with Datalog-style rules, do A6 entity resolution), then optionally `--neo4j` export. Say so explicitly rather than forcing graphify.
+Phase B.5 + the audit then fight to undo all of this. Avoid creating the mess instead:
 
-To invoke graphify, call the **Skill tool** with `skill: graphify` and args mapped from the design:
+### Path 1 - schema-first (DEFAULT for curated / structured / non-ASCII / auditable KGs)
+
+Build the graph the design already specifies - A4 types, A6 + canonical ids for entity resolution, A9 relation policy enforced **at extraction time** so there is no hairball to prune. This is the anti-hairball path.
+
+1. **Extract per source with the schema in the prompt.** Dispatch one extraction subagent per document (or per cell). Give each: the A4 node/edge types, the A9 keep/drop policy (emit only meaningful relations - **never** `mentioned_in`/`references`/`related_to`), and a **shared canonical id registry** so the same entity gets the same id across every file (`아이젠사이언스 -> partner_aigen` everywhere). That shared id is what keeps the cross-document bridge intact and is the single most important rule for Korean corpora. Each subagent returns `{nodes:[{id,type,label,props,source_url,source_location}], edges:[{source,target,relation,confidence,source_url,source_location,evidence}]}` with **span-level provenance** (A7). Collect all into one `extractions.json` (a list).
+2. **Merge + cluster deterministically** with the bundled builder - it dedups by canonical id, applies `aliases.json` (id -> canonical) for leftover ER misses, drops any weak relation that slipped through, computes modularity (networkx), and writes a graphify-compatible `graph.json` (`nodes`/`links`) + `graph.html`:
+   ```bash
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/kg-design/build_schema_graph.py extractions.json \
+     --out graphify-out --aliases aliases.json --labels labels.json --target 0.5
+   ```
+   `graph.json` is the exact format `/kg-query` reads, so query works immediately. Because the relation policy was enforced during extraction, modularity usually lands crisp (~0.6) with **no pruning** - the hairball never forms, so Phase B.5 is a no-op here.
+3. **Resolve the ER tail by hand (human-in-the-loop).** After the first build, scan for near-duplicate ids the subagents minted independently (same person/partner, different slug); add them to `aliases.json`, and put any vendor-name over-attribution into `labels.json` (`tech_genai -> "생성형 AI/LLM"`), then rebuild. This is the A6 step graphify cannot do for you.
+
+This is what produces a star-shaped, type-queryable, span-traceable graph instead of a document-reference hairball. Prefer it whenever the graph must answer specific CQs, carry a real schema, resolve entities cleanly, or is non-ASCII.
+
+### Path 2 - graphify (bottom-up exploration / code-heavy corpora)
+
+Use graphify for fast, low-effort discovery of "what concepts live in this folder", or for **code** (its AST extraction gives real call/def graphs with exact provenance schema-first can't match). Accept that you then need Phase B.5 to prune and the audit to catch the schema gap. To invoke graphify, call the **Skill tool** with `skill: graphify` and args mapped from the design:
 
 | Design decision | graphify args |
 |---|---|
@@ -152,6 +171,8 @@ graphify limitation to flag: it is bottom-up concept extraction. It does not enf
 ---
 
 ## Phase B.5 - REFINE (clustering gate; the part that makes it *look* like a real KG)
+
+**This phase applies to Path 2 (graphify) only. Schema-first builds (Path 1) already gate on modularity inside `build_schema_graph.py` and enforce the relation policy at extraction time, so there is no hairball to refine - skip to Phase C.**
 
 graphify's raw output is usually a hairball: weak `mentioned_in` edges make document nodes into god-hubs and pull every concept into one blob. This phase enforces the A9 decisions on the built graph and **gates on cluster separation (modularity)** before you call the build done. It does NOT touch the graphify package - it filters `graphify-out/.graphify_extract.json` (backing up the raw to `.graphify_extract.json.raw`) and re-runs graphify's own build/cluster/export.
 
