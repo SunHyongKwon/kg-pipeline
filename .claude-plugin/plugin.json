@@ -1,9 +1,8 @@
 {
   "name": "kg-pipeline",
   "displayName": "Knowledge Graph Pipeline",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "End-to-end knowledge-graph lifecycle: collect sources (get-content: search + snowball + community/deep-dive tiers), design+build a clustered graph with provenance (kg-design over graphify), and query it (kg-query). Clustering gate + span-level provenance built in.",
   "author": { "name": "mike" },
-  "keywords": ["knowledge-graph", "graphrag", "kg-design", "kg-query", "graphify", "scrapling"],
-  "hooks": "./hooks/hooks.json"
+  "keywords": ["knowledge-graph", "graphrag", "kg-design", "kg-query", "graphify", "scrapling"]
 }

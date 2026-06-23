@@ -9,7 +9,7 @@
       "name": "kg-pipeline",
       "source": "./",
       "description": "End-to-end knowledge-graph lifecycle with a clustering gate and span-level provenance.",
-      "version": "0.2.0"
+      "version": "0.2.1"
     }
   ]
 }
