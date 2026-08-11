@@ -1,0 +1,41 @@
+# PR이 열리면 머지를 처리합니다.
+#
+# CI가 있는 레포:  auto-merge로 예약 -> check 통과 후 자동 머지
+# CI가 없는 레포:  auto-merge가 거부되므로(대기할 게 없음) 바로 squash 머지
+#
+# 한 파일로 두 경우를 모두 처리하므로 레포마다 갈아끼울 필요가 없습니다.
+
+name: pr-merge
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pr-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    # 본인이 연 PR만. public 레포에서 이 조건을 지우면 아무나 머지시킬 수 있습니다.
+    if: github.event.pull_request.user.login == github.repository_owner
+    runs-on: ubuntu-latest
+    steps:
+      # checkout 스텝을 절대 추가하지 마세요.
+      # pull_request_target은 base 레포 권한으로 도는 트리거라
+      # PR 코드를 체크아웃하면 토큰이 그대로 노출됩니다.
+      - name: Merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: |
+          if gh pr merge --auto --squash "$PR"; then
+            echo "auto-merge 예약됨 (check 통과 대기)"
+          else
+            echo "auto-merge 불가 -> 즉시 머지"
+            gh pr merge --squash "$PR"
+          fi
